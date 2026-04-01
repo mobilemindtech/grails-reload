@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+group 'org.agent'
+version '0.0.1'
+
+jar {
+    manifest {
+        attributes(
+            'Premain-Class': 'org.agent.ReloadAgent',
+            'Can-Redefine-Classes': 'true',
+            'Can-Retransform-Classes': 'true'
+        )
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) { // Name of the publication
+            from components.java
+        }
+    }
+}

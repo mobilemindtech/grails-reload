@@ -1,0 +1,2 @@
+rootProject.name = 'hotreload-poc'
+include 'reload-agent', 'grails-reload', 'test-app'
