@@ -30,14 +30,39 @@ repositories {
 Add the plugin to your `build.gradle`
 
 ```groovy
-implementation 'org.apache.grails:grails-reload:0.0.1'
+dependencies {
+    implementation 'org.apache.grails:grails-reload:0.0.1'
+}
+
+tasks.named('bootRun') {
+    doFirst {
+
+        // Aponta para o JAR gerado pelo módulo do agente
+        def reloadAgentJar = project(':reload-agent').tasks.jar.archiveFile.get().asFile.absolutePath
+        def buildDirPath = layout.buildDirectory.get().asFile.absolutePath
+
+        // Flags cruciais para o JDK da JetBrains (DCEVM)
+        jvmArgs += [
+                "-javaagent:${reloadAgentJar}",
+                "-XX:+AllowEnhancedClassRedefinition",
+                "-XX:+EnableDynamicAgentLoading",
+                "-DsimpleAgentWatchPaths=${buildDirPath}/classes/groovy/main,${buildDirPath}/classes/java/main"
+        ]
+    }
+}
 ```
+
+To enable logs, add on logback-spring.xml:
+
+`<logger name="org.apache.grails.plugins.reload" level="DEBUG"/>`
+
+
 
 Start the watcher on application startup
 
 ```groovy
 
-import org.apache.grails.plugins.GrailsReloader
+import org.apache.grails.plugins.reload.GrailsReloader
 
 @CompileStatic
 class Application extends GrailsAutoConfiguration {
@@ -51,3 +76,4 @@ class Application extends GrailsAutoConfiguration {
     }
 }
 ```
+

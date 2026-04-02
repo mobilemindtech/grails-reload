@@ -99,13 +99,14 @@ tasks.withType(GroovyCompile).configureEach {
 
 bootRun {
     // Aponta para o JAR gerado pelo módulo do agente
-    def agentJar = project(':reload-agent').tasks.jar.archiveFile.get().asFile.absolutePath
+    def reloadAgentJar = project(':reload-agent').tasks.jar.archiveFile.get().asFile.absolutePath
+    def buildDirPath = layout.buildDirectory.get().asFile.absolutePath
 
     // Flags cruciais para o JDK da JetBrains (DCEVM)
     jvmArgs = [
-            "-javaagent:${agentJar}",
+            "-javaagent:${reloadAgentJar}",
             "-XX:+AllowEnhancedClassRedefinition",
             "-XX:+EnableDynamicAgentLoading",
-            "-DsimpleAgentWatchPath=${buildDir}/classes/groovy/main"
+            "-DsimpleAgentWatchPaths=${buildDirPath}/classes/groovy/main,${buildDirPath}/classes/java/main"
     ]
 }

@@ -21,6 +21,7 @@
         <logger name="StackTrace" level="ERROR" />
 
         <logger name="com.example" level="INFO"/>
+        <logger name="org.apache.grails.plugins.reload" level="DEBUG"/>
 
 <!--        <logger name="org.hibernate.SQL" level="DEBUG"/>-->
 <!--        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>-->

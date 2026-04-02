@@ -1,4 +1,4 @@
-package org.apache.grails.plugins
+package org.apache.grails.plugins.reload
 
 
 import grails.util.Holders
