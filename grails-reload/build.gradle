@@ -9,6 +9,7 @@ buildscript {
         classpath platform("org.apache.grails:grails-bom:$grailsVersion")
         classpath "org.apache.grails:grails-data-hibernate5"
         classpath "org.apache.grails:grails-gradle-plugins"
+
     }
 }
 
@@ -53,6 +54,7 @@ dependencies {
     testImplementation "org.apache.grails:grails-testing-support-datamapping"
     testImplementation "org.spockframework:spock-core"
     implementation project(':reload-agent')
+    implementation 'org.ow2.asm:asm:9.9.1'
 }
 
 compileJava.options.release = 25

@@ -6,6 +6,10 @@ plugins {
 group 'org.agent'
 version '0.0.1'
 
+dependencies {
+
+}
+
 jar {
     manifest {
         attributes(

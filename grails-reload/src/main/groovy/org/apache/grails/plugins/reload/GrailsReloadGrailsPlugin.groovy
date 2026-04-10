@@ -40,8 +40,6 @@ class GrailsReloadGrailsPlugin extends Plugin {
 
        Closure doWithSpring() {
            { ->
-               routeReloader(RouteReloader) {}
-               dependencyReloader(DependencyReloader) {}
            }
        }
 

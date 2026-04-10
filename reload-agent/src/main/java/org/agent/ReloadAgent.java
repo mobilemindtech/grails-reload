@@ -5,7 +5,10 @@ import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 public class ReloadAgent {
     private static Instrumentation inst;
@@ -29,7 +32,45 @@ public class ReloadAgent {
     }
     */
 
-    public static void reloadClass(String className, String classFilePath) {
+    public static List<Class<?>> reloadClass(Map<String, String> classesDefs) {
+        try {
+
+            ClassDefinition[] definitions = new ClassDefinition[classesDefs.size()];
+            var index = 0;
+
+            for (Map.Entry<String, String> classDef : classesDefs.entrySet()) {
+
+                var className = classDef.getKey();
+                var classFile = classDef.getValue();
+                byte[] b = Files.readAllBytes(Paths.get(classFile));
+                Class<?> clazz = Class.forName(className);
+                definitions[index++] = new ClassDefinition(clazz, b);
+            }
+
+            inst.redefineClasses(definitions);
+
+            try {
+                Class<?> registryClass = Class.forName("groovy.lang.MetaClassRegistry");
+                // Se estiver usando Groovy, você pode precisar disparar a limpeza via reflection
+                // ou simplesmente chamar no lado do Groovy após o reload.
+            } catch (Exception e) { /* não é groovy, ignore */ }
+
+            List<Class<?>> results = new ArrayList<>();
+
+            for (var def : definitions) {
+                results.add(def.getDefinitionClass());
+            }
+
+            return results;
+
+        }catch (Exception e) {
+            System.err.println("::> ReloadAgent: erro ao redefinir classe: " + e.getMessage());
+        }
+
+        return new ArrayList<>();
+    }
+
+    public static void reloadClass2(String className, String classFilePath) {
         try {
             byte[] b = Files.readAllBytes(Paths.get(classFilePath));
             Class<?> clazz = Class.forName(className);

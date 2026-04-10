@@ -1,10 +1,8 @@
 package org.apache.grails.plugins.reload
 
+
 import groovy.transform.TupleConstructor
-import org.agent.ReloadAgent
-import grails.util.Holders
 import groovy.util.logging.Slf4j
-import org.springframework.context.ApplicationContext
 import org.springframework.core.task.VirtualThreadTaskExecutor
 
 import java.nio.ByteBuffer
@@ -24,6 +22,7 @@ class GrailsReloader {
         Path relativePath
         Path rootPath
         Path watchDir
+        Class<?> loadedClass
 
         String getClassFullName() {
             rootPath.relativize(absolutePath)
@@ -69,6 +68,7 @@ class GrailsReloader {
     private static final VirtualThreadTaskExecutor executor = new VirtualThreadTaskExecutor()
     private static final List<FileChangedEvent> EVENTS = new ArrayList<>()
     private static long LAST_EVENT_RECEIVED = 0
+    private static final  Map<String, String> FILES_HASH = new HashMap<>()
 
     static void startWatcher(){
 
@@ -82,6 +82,16 @@ class GrailsReloader {
                 continue
             }
             watch(classPath)
+
+            def site = FILES_HASH.size()
+            log.info "load hash to files on $classPath.."
+            new File(classPath)
+                    .eachDirRecurse {file ->
+                        file.eachFileMatch(~/.*.class/) {f ->
+                            FILES_HASH.put(f.absolutePath, generateCheckSum(f.toPath()))
+                        }
+                    }
+            log.info "loaded hashs to ${FILES_HASH.size() - site} files!"
         }
     }
 
@@ -99,6 +109,7 @@ class GrailsReloader {
                         return FileVisitResult.CONTINUE
                     }
                 })
+
             }
 
             registerRecursive(rootPath)
@@ -130,9 +141,9 @@ class GrailsReloader {
                             // Ex: /app/build/classes/com/exemplo/User.class -> com.exemplo.User
 
                             def reloadFile = new FileChangedEvent(
-                                    rootPath: rootPath,
-                                    watchDir: watchDir,
-                                    relativePath: relativePath,
+                                rootPath: rootPath,
+                                watchDir: watchDir,
+                                relativePath: relativePath,
                             )
                             EVENTS.add(reloadFile)
                         }
@@ -175,20 +186,20 @@ class GrailsReloader {
                 if(events.isEmpty())
                     continue
                 
-                log.debug "::> ${events.size()} files to reload"
+                log.debug "::> ${events.size()} files to reloaded via ReloadAgent"
 
-                events.groupBy { it.mainClassSimpleName }
-                    .each {files ->
-                        files.value
-                                .sort {x, y ->
-                                    x.classSimpleName.contains('$') ? -1 : 1
-                                }
-                                .each(this.&processEvent)
-                    }
+                dispatchEvents(events)
 
-                log.debug "::> Grails reload done!"
+                log.debug "::> Grails reload is done!"
             }
         }
+    }
+
+    private static void dispatchEvents(List<FileChangedEvent> fileChangedEvents){
+        def events = fileChangedEvents.findAll {
+            hasContentChanged(it.absolutePath)
+        }
+        new ReloadPipeline().start(events)
     }
 
     static boolean isFileReady(Path path) {
@@ -209,55 +220,25 @@ class GrailsReloader {
         }
     }
 
-    private static void processEvent(FileChangedEvent fileChangedEvent){
+    private static boolean hasContentChanged(Path file) {
+        String currentHash = generateCheckSum(file) // Ou use MessageDigest
 
-        //def fileTime = Files.getLastModifiedTime(fileChangedEvent.absolutePath)
-        log.debug "::> file changed: ${fileChangedEvent.absoluteFile}"
-
-        final ctx = Holders.grailsApplication.mainContext
-        def routeReloader = ctx.getBean("routeReloader") as RouteReloader
-        def dependencyReloader = ctx.getBean("dependencyReloader") as DependencyReloader
-
-        ReloadAgent.reloadClass(fileChangedEvent.classFullName, fileChangedEvent.absoluteFile)
-
-        Class beanClass = dependencyReloader.loadClass(fileChangedEvent.classFullName, ctx.classLoader)
-
-        def isController = fileChangedEvent.isController()
-        def isBean = fileChangedEvent.isService() || isSpringBean(ctx, beanClass)
-
-        if (isController || isBean) {
-
-            // No Spring/Grails, o beanName costuma ser o nome da classe com a primeira letra minúscula
-            //String beanName = Introspector.decapitalize(fullFile.toString().split(File.separator).last().replace(".class", ""))
-            String[] names = ctx.getBeanNamesForType(beanClass)
-
-            if(isController){
-                dependencyReloader.refreshControllerArtefact(beanClass)
-                return
-            }
-
-            String beanName = names[0]
-            Object beanInstance = ctx.getBean(beanName)
-
-            dependencyReloader.reautowire(beanInstance)
-
-            // 3. Injeta o novo Service que você acabou de escrever no código
-            if(!isController) {
-                // o service precisa ser redefinido para criar novo proxy, caso contrário
-                // propriedades closure não são encontradas
-                dependencyReloader.rebindService(beanName, beanClass)
-            }
-
-            if(isController) {
-                // 4. Mapeia novas rotas
-                routeReloader.reloadController(beanName)
-            }
-
+        if(!FILES_HASH.containsKey(file.toString())){
+            return  true
         }
+
+        String oldHash = FILES_HASH.get(file.toString())
+
+        if (currentHash == oldHash) {
+            return false // Bytecode idêntico, ignore o reload
+        }
+
+        FILES_HASH.put(file.toString(), currentHash)
+        return true
     }
 
-    private static boolean isSpringBean(ApplicationContext ctx, Class < ? > clazz) {
-        String[] beanNames = ctx.getBeanNamesForType(clazz)
-        return beanNames.length > 0
+    private static String generateCheckSum(Path file){
+        byte[] bytes = Files.readAllBytes(file)
+        return ClassSignatureHash.getFingerprint(bytes).md5()
     }
 }
